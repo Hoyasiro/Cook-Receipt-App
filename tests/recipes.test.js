@@ -122,6 +122,15 @@ describe('parseCommand', () => {
       '이전 단계': 'prevStep',
       '한 번 더 읽어 줘': 'read',
       '다시 한 번 재생': 'play',
+      '타이머 시작': 'timer:start',
+      '타이머 켜 줘': 'timer:start',
+      '3분 타이머': 'timer:set:180',
+      '삼 분 타이머 맞춰 줘': 'timer:set:180',
+      '1분 30초 타이머': 'timer:set:90',
+      '십오분 알람': 'timer:set:900',
+      '타이머 꺼': 'timer:cancel',
+      '타이머 취소': 'timer:cancel',
+      '알았어': 'dismiss',
       '오늘 날씨 어때': null,
       '이제 멸치를 팬에 넣고 아래쪽까지 잘 볶아 주세요': null
     }
@@ -188,5 +197,25 @@ Markdown Content:
     const r = structureText('Title: x\n로그인\n이 요리는 아주 간단합니다. 멸치를 볶고 간장을 넣은 다음 잘 섞어서 완성하면 됩니다. 정말 쉬워요.')
     expect(r.text).not.toMatch(/로그인|Title/)
     expect(structureText('')).toBeNull()
+  })
+})
+
+import { parseDurations, formatRemaining } from '../src/lib/timers.js'
+
+describe('parseDurations', () => {
+  it('단계 문장에서 시간을 찾는다', () => {
+    const secs = (t) => parseDurations(t).map((d) => d.seconds)
+    expect(secs('중약불에서 2분간 볶아 비린내를 날려요.')).toEqual([120])
+    expect(parseDurations('2~3분 정도 끓여요')).toEqual([{ seconds: 120, label: '2~3분' }])
+    expect(parseDurations('1분 30초 동안 저어 주세요')).toEqual([{ seconds: 90, label: '1분 30초' }])
+    expect(secs('30분 정도 재워 두고 5분간 끓여요')).toEqual([1800, 300])
+    expect(secs('1시간 30분 삶아요')).toEqual([5400])
+    expect(secs('2인분 기준, 식초 1큰술, 충분히 섞어요')).toEqual([])
+    expect(secs('10초간 데쳐요')).toEqual([10])
+  })
+  it('남은 시간 표시', () => {
+    expect(formatRemaining(90)).toBe('1:30')
+    expect(formatRemaining(3725)).toBe('1:02:05')
+    expect(formatRemaining(-3)).toBe('0:00')
   })
 })

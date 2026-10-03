@@ -326,3 +326,49 @@ main { padding: 12px 16px 110px; max-width: 980px; margin: 0 auto; }
 .center { text-align: center; }
 .guide h3 { font-size: 1rem; margin: 18px 0 4px; }
 .guide p { line-height: 1.6; }
+
+/* ── 타이머 ── */
+.timer-btn {
+  width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface); font-size: 1.3rem; cursor: pointer; flex: none;
+}
+.timer-picker { padding: 10px 12px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.timer-picker .presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
+.timer-picker .presets button {
+  padding: 12px 0; border-radius: 12px; border: 1px solid var(--line); background: var(--bg);
+  font-size: 1.05rem; font-weight: 700; cursor: pointer;
+}
+.timer-picker .row { align-items: center; }
+.timer-picker input { width: 80px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 1.1rem; background: var(--bg); }
+.timer-bar, .timer-dock { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.timer-bar { padding: 8px 12px 0; }
+.timer-pill {
+  display: inline-flex; align-items: center; flex: none; border-radius: 999px;
+  background: var(--text); color: var(--bg); font-size: 1rem; overflow: hidden; border: none; cursor: pointer;
+}
+.timer-pill b { font-size: 1.25rem; font-variant-numeric: tabular-nums; margin-left: 4px; }
+.timer-pill small { opacity: 0.75; margin-left: 2px; }
+.timer-pill.done { background: var(--danger); animation: pulse 1s infinite; }
+.pill-main, .pill-x { border: none; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.pill-main { padding: 8px 6px 8px 14px; display: inline-flex; align-items: center; gap: 2px; }
+.pill-x { padding: 8px 14px 8px 8px; opacity: 0.7; }
+.timer-dock {
+  position: fixed; left: 12px; right: 90px; bottom: calc(env(safe-area-inset-bottom) + 24px); z-index: 6;
+}
+.timer-dock .timer-pill { padding: 10px 14px; gap: 4px; box-shadow: var(--shadow); }
+.step-timers { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.timer-chip {
+  border: 2px solid var(--accent); background: var(--accent-soft); color: var(--accent);
+  border-radius: 999px; padding: 8px 16px; font-size: 0.8em; font-weight: 800; cursor: pointer;
+}
+.timer-chip.running { background: var(--accent); color: #fff; font-variant-numeric: tabular-nums; }
+.ring-overlay {
+  position: fixed; inset: 0; z-index: 40; background: rgba(211, 60, 60, 0.92);
+  display: grid; place-items: center; padding: 24px; animation: flashbg 1s infinite alternate;
+}
+@keyframes flashbg { to { background: rgba(232, 98, 44, 0.95); } }
+.ring-box { background: var(--bg); border-radius: 24px; padding: 24px; width: 100%; max-width: 420px; text-align: center; }
+.ring-icon { font-size: 4rem; margin: 0; line-height: 1.1; }
+.ring-title { font-size: 2.2rem; font-weight: 900; margin: 6px 0 10px; }
+.ring-item { font-size: 1.3rem; font-weight: 700; margin: 4px 0; }
+.ring-ok { min-height: 64px; font-size: 1.4rem; margin-top: 16px; }

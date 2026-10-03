@@ -50,7 +50,18 @@ export function parseStepNumber(t) {
   return m ? koreanNumber(m[1]) : null
 }
 
-/** 말한 문장 → 동작 이름 (모르면 null). 번호 이동은 "goto:7" */
+/** "3분 30초", "삼 분", "십오분", "1시간" → 초 (없으면 0) */
+export function parseSpokenDuration(t) {
+  let total = 0
+  for (const [unit, mul] of [['시간', 3600], ['분', 60], ['초', 1]]) {
+    const m = String(t).match(new RegExp(`([0-9]+|[가-힣]+?)\\s*${unit}`))
+    const n = m && koreanNumber(m[1])
+    if (n) total += n * mul
+  }
+  return total
+}
+
+/** 말한 문장 → 동작 이름 (모르면 null). 번호 이동은 "goto:7", 타이머는 "timer:start|cancel|set:초" */
 export function parseCommand(transcript) {
   const t = String(transcript || '').replace(/\s+/g, ' ').trim()
   if (!t) return null
@@ -58,6 +69,12 @@ export function parseCommand(transcript) {
   if (t.replace(/\s/g, '').length > 14) return null
   // "그만 들어"가 "들어"보다 먼저 걸리도록 stop 을 먼저 본다
   if (RULES.at(-1)[1].test(t)) return 'stop'
+  if (/(알았어|확인|알람\s*꺼|그만\s*울려|알람\s*끄)/.test(t)) return 'dismiss'
+  if (/(타이머|알람)/.test(t)) {
+    if (/(취소|꺼|끄|정지|멈춰|그만|삭제|지워)/.test(t)) return 'timer:cancel'
+    const sec = parseSpokenDuration(t)
+    return sec ? `timer:set:${sec}` : 'timer:start'
+  }
   // "한 번 더 읽어 줘", "다시 한 번 재생" 의 '한 번' 은 번호가 아니다
   if (!/(읽어|말해|재생|틀어|더)/.test(t)) {
     const n = parseStepNumber(t)

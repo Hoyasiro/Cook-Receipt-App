@@ -6,6 +6,7 @@ import ImportPanel from './components/ImportPanel.vue'
 import CookMode from './components/CookMode.vue'
 import Sheet from './components/Sheet.vue'
 import Thumb from './components/Thumb.vue'
+import { dismissFired, formatRemaining, remaining, ringing, timers } from './lib/timers.js'
 import { CATEGORIES, matchesQuery, parseNoteText, parseShare, SOURCE_LABEL } from './lib/recipes.js'
 import { addRecipe, fillMissingMeta, findByUrl, prefetchContents, markOpened, removeRecipe, state, updateRecipe } from './lib/store.js'
 
@@ -171,6 +172,13 @@ watch(filters, (f) => {
   if (!f.includes(filter.value)) filter.value = '전체'
 })
 
+// ── 타이머 ──
+const firedTimers = computed(() => timers.filter((t) => t.fired))
+function openTimerRecipe(t) {
+  const r = state.recipes.find((x) => x.id === t.recipeId)
+  if (r) onOpen(r)
+}
+
 const appUrl = computed(() => location.origin + location.pathname)
 </script>
 
@@ -220,6 +228,27 @@ const appUrl = computed(() => location.origin + location.pathname)
       />
     </div>
   </main>
+
+  <!-- 목록 화면에서도 돌아가는 타이머가 보이게 -->
+  <div v-if="timers.length && modal?.type !== 'cook'" class="timer-dock">
+    <button v-for="t in timers" :key="t.id" class="timer-pill" :class="{ done: t.fired }" @click="openTimerRecipe(t)">
+      {{ t.fired ? "⏰" : "⏱" }} {{ t.recipeTitle }}<small v-if="t.step != null">&nbsp;· {{ t.step + 1 }}단계</small>
+      <b>{{ t.fired ? '끝!' : formatRemaining(remaining(t)) }}</b>
+    </button>
+  </div>
+
+  <!-- 타이머 종료: 멀리서도 보이게 화면 전체로 -->
+  <div v-if="ringing && firedTimers.length" class="ring-overlay" role="alertdialog" @click="dismissFired">
+    <div class="ring-box">
+      <p class="ring-icon">⏰</p>
+      <p class="ring-title">타이머 끝!</p>
+      <p v-for="t in firedTimers" :key="t.id" class="ring-item">
+        {{ t.recipeTitle }}<template v-if="t.step != null"> · {{ t.step + 1 }}단계</template> ({{ t.label }})
+      </p>
+      <button class="btn primary block ring-ok">확인</button>
+      <p class="muted">“알았어”라고 말해도 꺼져요</p>
+    </div>
+  </div>
 
   <button class="fab" aria-label="레시피 추가" @click="openModal({ type: 'form' })">＋</button>
 
@@ -303,6 +332,7 @@ const appUrl = computed(() => location.origin + location.pathname)
         <li>“<b>맨 위로</b>” “<b>재료 화면으로</b>” “<b>내려</b>” “<b>올려</b>” “<b>전체 보기</b>”</li>
         <li>“<b>크게</b>” “<b>작게</b>”(글씨 크기)</li>
         <li>유튜브: “<b>재생</b>” “<b>멈춰</b>” “<b>뒤로</b>”(10초) “<b>앞으로</b>”</li>
+        <li>타이머: “<b>타이머 시작</b>”(지금 단계의 시간) “<b>3분 타이머</b>” “<b>타이머 꺼</b>” · 알람이 울리면 “<b>알았어</b>”</li>
         <li>“<b>닫아</b>” “<b>그만 들어</b>”</li>
       </ul>
       <p class="muted">앱 아이콘을 길게 누르면 “레시피 추가”, “오늘 뭐 먹지?” 바로가기도 있어요.</p>

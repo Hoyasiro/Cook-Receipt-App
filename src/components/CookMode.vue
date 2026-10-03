@@ -3,6 +3,10 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { youtubeId, SOURCE_LABEL } from '../lib/recipes.js'
 import { createVoiceListener, isVoiceSupported, speak } from '../lib/voice.js'
 import { isContentLoading, loadContent } from '../lib/store.js'
+import {
+  cancelRecipeTimers, cancelTimer, dismissFired, formatDuration, formatRemaining, parseDurations, remaining,
+  ringing, startTimer, timers
+} from '../lib/timers.js'
 
 const props = defineProps({ recipe: { type: Object, required: true } })
 const emit = defineEmits(['close'])
@@ -128,6 +132,29 @@ async function read() {
   voice?.resume()
 }
 
+// ── 스텝별 타이머 ──
+const stepDurations = computed(() => steps.value.map((st) => parseDurations(st.text)))
+const recipeTimers = computed(() => timers.filter((t) => t.recipeId === props.recipe.id))
+function stepTimer(step, seconds) {
+  return recipeTimers.value.find((t) => t.step === step && t.seconds === seconds)
+}
+function startStepTimer(step, seconds, label) {
+  startTimer({ recipeId: props.recipe.id, recipeTitle: props.recipe.title, step, seconds, label })
+  showFlash(`⏱ ${label || formatDuration(seconds)} 시작`)
+}
+const currentStep = computed(() => (hasPages.value && page.value >= 0 ? page.value : null))
+
+// 직접 맞추기
+const picker = ref(false)
+const customMin = ref(5)
+const PRESETS = [1, 3, 5, 10, 15, 20, 30]
+function startCustom(min) {
+  const sec = Math.round(Number(min) * 60)
+  if (!(sec > 0)) return
+  startStepTimer(currentStep.value, sec)
+  picker.value = false
+}
+
 // ── 음성 명령 ──
 const voiceSupported = isVoiceSupported()
 const listening = ref(false)
@@ -157,7 +184,27 @@ async function gotoStep(n) {
   return goPage(n - 1)
 }
 
+function onTimerCommand(action) {
+  if (action === 'timer:cancel') {
+    if (!recipeTimers.value.length) return showFlash('켜진 타이머가 없어요')
+    cancelRecipeTimers(props.recipe.id)
+    return showFlash('⏱ 타이머 취소')
+  }
+  if (action.startsWith('timer:set:')) return startStepTimer(currentStep.value, Number(action.slice(10)))
+  // "타이머 시작": 지금 단계 문장에 있는 시간으로
+  const d = currentStep.value != null ? stepDurations.value[currentStep.value][0] : null
+  if (!d) return showFlash('이 단계엔 시간이 없어요 · “3분 타이머”처럼 말해 주세요')
+  return startStepTimer(currentStep.value, d.seconds, d.label)
+}
+
 async function onCommand(action) {
+  // 알람이 울리는 중이면 "알았어/멈춰/그만"으로 끈다
+  if (ringing.value && ['dismiss', 'pause', 'timer:cancel', 'stop'].includes(action)) {
+    dismissFired()
+    return showFlash('⏰ 알람 끔')
+  }
+  if (action === 'dismiss') return
+  if (action.startsWith('timer:')) return onTimerCommand(action)
   if (action.startsWith('goto:')) return gotoStep(Number(action.slice(5)))
   showFlash(ACTION_LABEL[action] || '')
   switch (action) {
@@ -244,6 +291,7 @@ onUnmounted(() => {
         <button :disabled="scaleIdx === 0" aria-label="글씨 작게" @click="zoom(-1)">가<sup>−</sup></button>
         <button :disabled="scaleIdx === SCALES.length - 1" aria-label="글씨 크게" @click="zoom(1)">가<sup>+</sup></button>
       </div>
+      <button class="timer-btn" aria-label="타이머 맞추기" @click="picker = !picker">⏱</button>
       <button
         v-if="voiceSupported"
         class="mic"
@@ -258,10 +306,34 @@ onUnmounted(() => {
     <div v-if="listening || voiceError" class="voice-bar" :class="{ err: voiceError }">
       <template v-if="voiceError">{{ voiceError }}</template>
       <template v-else>
-        <span class="dot" /> 듣는 중 — “다음” “이전” “3번” “끝으로” “맨 위로” “재료” “내려” “올려” “읽어 줘” “크게”<template v-if="ytId">
+        <span class="dot" /> 듣는 중 — “다음” “이전” “3번” “끝으로” “맨 위로” “재료” “내려” “올려” “읽어 줘” “타이머 시작” “3분 타이머” “크게”<template v-if="ytId">
           “재생” “멈춰” “뒤로”</template>
         <span v-if="heard" class="heard">· {{ heard }}</span>
       </template>
+    </div>
+
+    <div v-if="picker" class="timer-picker">
+      <div class="presets">
+        <button v-for="m in PRESETS" :key="m" @click="startCustom(m)">{{ m }}분</button>
+      </div>
+      <div class="row">
+        <input v-model.number="customMin" type="number" min="0.5" step="0.5" inputmode="decimal" aria-label="분" />
+        <span>분</span>
+        <button class="btn primary grow" @click="startCustom(customMin)">
+          {{ currentStep != null ? `${currentStep + 1}단계 ` : '' }}타이머 시작
+        </button>
+      </div>
+    </div>
+
+    <div v-if="recipeTimers.length" class="timer-bar">
+      <span v-for="t in recipeTimers" :key="t.id" class="timer-pill" :class="{ done: t.fired }">
+        <button class="pill-main" @click="t.step != null && goPage(t.step)">
+          {{ t.fired ? '⏰ 끝!' : '⏱' }}
+          <small v-if="t.step != null">{{ t.step + 1 }}단계</small>
+          <b>{{ t.fired ? t.label : formatRemaining(remaining(t)) }}</b>
+        </button>
+        <button class="pill-x" aria-label="타이머 끄기" @click="cancelTimer(t.id)">✕</button>
+      </span>
     </div>
 
     <nav v-if="hasPages" class="view-tabs" role="tablist">
@@ -298,6 +370,16 @@ onUnmounted(() => {
               <b>{{ page + 1 }}</b> <small>/ {{ steps.length }} 단계</small>
             </p>
             <p class="focus-text">{{ steps[page].text }}</p>
+            <div v-if="stepDurations[page].length" class="step-timers">
+              <template v-for="d in stepDurations[page]" :key="d.seconds">
+                <button v-if="!stepTimer(page, d.seconds)" class="timer-chip" @click="startStepTimer(page, d.seconds, d.label)">
+                  ⏱ {{ d.label }} 타이머
+                </button>
+                <button v-else class="timer-chip running" @click="cancelTimer(stepTimer(page, d.seconds).id)">
+                  ⏱ {{ formatRemaining(remaining(stepTimer(page, d.seconds))) }} · 끄기
+                </button>
+              </template>
+            </div>
             <img v-if="steps[page].image" :src="steps[page].image" alt="" referrerpolicy="no-referrer" />
           </section>
         </template>
@@ -317,6 +399,16 @@ onUnmounted(() => {
                 <span class="no">{{ i + 1 }}</span>
                 <div>
                   <p>{{ s.text }}</p>
+                  <div v-if="stepDurations[i].length" class="step-timers" @click.stop>
+                    <template v-for="d in stepDurations[i]" :key="d.seconds">
+                      <button v-if="!stepTimer(i, d.seconds)" class="timer-chip" @click="startStepTimer(i, d.seconds, d.label)">
+                        ⏱ {{ d.label }}
+                      </button>
+                      <button v-else class="timer-chip running" @click="cancelTimer(stepTimer(i, d.seconds).id)">
+                        ⏱ {{ formatRemaining(remaining(stepTimer(i, d.seconds))) }} ✕
+                      </button>
+                    </template>
+                  </div>
                   <img v-if="s.image" :src="s.image" alt="" loading="lazy" referrerpolicy="no-referrer" />
                 </div>
               </li>

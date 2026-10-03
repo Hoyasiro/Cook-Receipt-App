@@ -45,6 +45,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png}'],
         navigateFallback: `${base}index.html`,
+        importScripts: ['sw-notify.js'],
         // 썸네일·조리 사진을 한 번 보면 저장해 두어 인터넷이 약해도 보이게 한다
         runtimeCaching: [
           {
