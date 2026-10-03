@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { guessCategory, parseNoteText, SOURCE_LABEL, detectSource } from '../lib/recipes.js'
-import { addRecipe, exportJson, fillMissingMeta, findByUrl, importJson } from '../lib/store.js'
+import { addRecipe, exportJson, fillMissingMeta, findByUrl, importJson, prefetchContents } from '../lib/store.js'
 
 const props = defineProps({ initialText: { type: String, default: '' } })
 const emit = defineEmits(['done', 'toast'])
@@ -20,8 +20,9 @@ const newOnes = computed(() => parsed.value.filter((it) => !it.exists))
 function importNote() {
   const items = newOnes.value
   for (const it of items) addRecipe(it)
-  emit('toast', `${items.length}개 레시피를 가져왔어요`)
+  emit('toast', `${items.length}개 레시피를 가져왔어요. 내용은 뒤에서 미리 저장해 둘게요`)
   fillMissingMeta()
+  prefetchContents()
   emit('done')
 }
 
@@ -58,6 +59,7 @@ async function restore(ev) {
     const added = importJson(await file.text())
     emit('toast', `백업에서 ${added}개를 복원했어요`)
     fillMissingMeta()
+    prefetchContents()
     emit('done')
   } catch (e) {
     emit('toast', e.message || '백업 파일을 읽지 못했어요')

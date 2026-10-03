@@ -90,6 +90,8 @@ describe('parseCommand', () => {
       '맨 위로': 'top',
       '맨 아래로 가 줘': 'bottom',
       '다음 단계': 'nextStep',
+      '다음': 'nextStep',
+      '이전': 'prevStep',
       '이전 단계': 'prevStep',
       '읽어 줘': 'read',
       '재생': 'play',
@@ -98,6 +100,10 @@ describe('parseCommand', () => {
       '앞으로 넘겨': 'forward',
       '그만 들어': 'stop',
       '닫아 줘': 'close',
+      '글씨 크게': 'bigger',
+      '작게 해 줘': 'smaller',
+      '재료 보여 줘': 'ingredients',
+      '전체 보기': 'all',
       '오늘 날씨 어때': null,
       '이제 멸치를 팬에 넣고 아래쪽까지 잘 볶아 주세요': null
     }
@@ -127,5 +133,42 @@ describe('parseRecipeHtml', () => {
     const html = `<script type="application/ld+json">{"@graph":[{"@type":["Recipe"],"name":"a","recipeInstructions":"1. 썰기\\n2. 볶기"}]}</script>`
     expect(parseRecipeHtml(html).steps.map((s) => s.text)).toEqual(['1. 썰기', '2. 볶기'])
     expect(parseRecipeHtml('<html>nothing</html>')).toBeNull()
+  })
+})
+
+import { structureText } from '../src/lib/content.js'
+
+describe('structureText', () => {
+  it('리더 본문에서 잡음을 지우고 재료·순서로 나눈다', () => {
+    const md = `Title: 멸치볶음 만드는 법
+URL Source: https://m.10000recipe.com/recipe/6891816
+Markdown Content:
+로그인
+회원가입
+![사진](https://img/1.jpg)
+마지막 한 젓가락까지 바삭한 멸치볶음
+[재료] Ingredients
+* 잔멸치 1컵
+* 간장 1스푼 [구매](https://shop)
+조리순서 Steps
+1. 팬에 기름 없이 멸치를 볶아 비린내를 날려요.
+체에 쳐서 가루를 털어요.
+2. 간장과 올리고당을 넣고 약불에서 볶아요.
+3. 깨를 뿌려 마무리해요.
+요리 후기
+맛있어요!`
+    const r = structureText(md)
+    expect(r.ingredients).toEqual(['잔멸치 1컵', '간장 1스푼'])
+    expect(r.steps.map((s) => s.text)).toEqual([
+      '팬에 기름 없이 멸치를 볶아 비린내를 날려요. 체에 쳐서 가루를 털어요.',
+      '간장과 올리고당을 넣고 약불에서 볶아요.',
+      '깨를 뿌려 마무리해요.'
+    ])
+  })
+
+  it('구조를 못 찾으면 정리된 본문 텍스트를 준다', () => {
+    const r = structureText('Title: x\n로그인\n이 요리는 아주 간단합니다. 멸치를 볶고 간장을 넣은 다음 잘 섞어서 완성하면 됩니다. 정말 쉬워요.')
+    expect(r.text).not.toMatch(/로그인|Title/)
+    expect(structureText('')).toBeNull()
   })
 })

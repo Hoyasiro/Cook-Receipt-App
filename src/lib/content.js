@@ -73,11 +73,90 @@ function clean(t) {
     .trim()
 }
 
-async function getText(url, ms = 12000) {
+/**
+ * JSON-LD 가 없을 때 만개의레시피 화면 구조에서 직접 뽑는다 (브라우저 DOMParser 필요)
+ *   재료: #divConfirmedMaterialArea li / .ready_ingre3 li   순서: [id^=stepdescr] / .step_list_txt
+ */
+export function parseRecipeDom(html) {
+  if (typeof DOMParser === 'undefined') return null
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const pick = (sels) => {
+    for (const sel of sels) {
+      const els = [...doc.querySelectorAll(sel)]
+      if (els.length) return els
+    }
+    return []
+  }
+  const ingredients = pick(['#divConfirmedMaterialArea li', '.ready_ingre3 li', '.ingre_list li', '[class*="ingredient"] li'])
+    .map((li) => clean(li.textContent.replace(/구매/g, '')))
+    .filter(Boolean)
+  const steps = pick(['[id^="stepdescr"]', '.step_list_txt', '.view_step_cont .media-body', '[class*="step"] li'])
+    .map((el) => ({ text: clean(el.textContent), image: el.closest('[id^="stepDiv"], li')?.querySelector('img')?.getAttribute('src') || '' }))
+    .filter((s) => s.text)
+  if (steps.length < 2) return null
+  return { title: clean(doc.querySelector('h3, h1')?.textContent), ingredients, steps }
+}
+
+const JUNK = /(로그인|회원가입|광고|공유하기|스크랩|댓글|구독|팔로우|앱\s*다운|쿠키|copyright|ⓒ|©|바로가기|메뉴|검색|더보기|이전글|다음글|관련\s*레시피|추천\s*레시피|요리\s*후기|사진\s*후기|리뷰|신고)/i
+const END_MARK = /^(#+\s*)?(댓글|요리\s*후기|관련\s*레시피|추천\s*레시피|이\s*레시피와|레시피\s*작성자|요리\s*팁\s*더보기)/
+const ING_MARK = /^(#+\s*)?(\[?\s*재료|재료\s*Ingredients|Ingredients)/i
+const STEP_MARK = /^(#+\s*)?(조리\s*순서|요리\s*순서|만드는\s*(법|방법)|레시피\s*순서|Steps?|How to)/i
+const STEP_LINE = /^(step\s*\d+|\d+\s*[.)]|\d+\s*단계)\s*/i
+
+/** 리더 서비스의 본문 텍스트에서 잡음을 지우고, 가능하면 재료·순서로 나눈다 */
+export function structureText(raw) {
+  let lines = String(raw || '')
+    .replace(/^(Title|URL Source|Published Time|Markdown Content|Warning):.*$/gim, '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[*_`>|]+/g, ' ')
+    .split('\n')
+    .map((l) => l.replace(/\s+/g, ' ').trim())
+    .filter((l) => l && !/^[-=#\s]+$/.test(l) && !/^https?:\/\//.test(l))
+
+  // 후기·댓글 이후는 버린다
+  const end = lines.findIndex((l, i) => i > 5 && END_MARK.test(l))
+  if (end > 0) lines = lines.slice(0, end)
+  lines = lines.filter((l) => !(l.length < 25 && JUNK.test(l)))
+
+  const ingAt = lines.findIndex((l) => ING_MARK.test(l))
+  const stepAt = lines.findIndex((l, i) => i > ingAt && STEP_MARK.test(l))
+
+  let ingredients = []
+  let steps = []
+  if (ingAt >= 0 && stepAt > ingAt) {
+    ingredients = lines
+      .slice(ingAt + 1, stepAt)
+      .map((l) => l.replace(/\s*구매$/, ''))
+      .filter((l) => l && l.length <= 40 && !ING_MARK.test(l))
+    steps = lines.slice(stepAt + 1)
+  } else {
+    const numbered = lines.filter((l) => STEP_LINE.test(l))
+    if (numbered.length >= 2) steps = lines.slice(lines.indexOf(numbered[0]))
+  }
+  // 번호 줄을 기준으로 단계를 묶는다 (번호가 없으면 줄마다 한 단계)
+  if (steps.length) {
+    const grouped = []
+    const hasNumbers = steps.filter((l) => STEP_LINE.test(l)).length >= 2
+    for (const l of steps) {
+      if (!hasNumbers || STEP_LINE.test(l) || !grouped.length) {
+        const text = l.replace(STEP_LINE, '').trim()
+        if (text) grouped.push({ text })
+        else grouped.push({ text: '' })
+      } else grouped[grouped.length - 1].text += ` ${l}`
+    }
+    steps = grouped.map((s) => ({ text: s.text.trim() })).filter((s) => s.text.length > 1)
+  }
+  if (steps.length >= 2) return { ingredients, steps, fromText: true }
+  const text = lines.join('\n').trim()
+  return text.length > 50 ? { text } : null
+}
+
+async function getText(url, init = {}, ms = 15000) {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), ms)
   try {
-    const res = await fetch(url, { signal: ctrl.signal })
+    const res = await fetch(url, { ...init, signal: ctrl.signal })
     return res.ok ? await res.text() : null
   } catch {
     return null
@@ -86,24 +165,21 @@ async function getText(url, ms = 12000) {
   }
 }
 
+function fromHtml(html) {
+  if (!html) return null
+  return parseRecipeHtml(html) || parseRecipeDom(html)
+}
+
 /**
- * { ingredients, steps } 또는 { text } 를 돌려준다. 둘 다 실패하면 null.
- * 1) 원본 HTML 을 받아 JSON-LD 해석  2) 실패 시 본문 텍스트(리더 서비스)
+ * { ingredients, steps } 또는 { text } 를 돌려준다. 모두 실패하면 null.
+ * 1) 원본 HTML(allorigins) → JSON-LD / 화면 구조
+ * 2) 리더 서비스의 HTML(r.jina.ai) → 같은 해석
+ * 3) 리더 서비스의 본문 텍스트 → 잡음 제거·구조화
  */
 export async function fetchRecipeContent(url) {
-  const html = await getText(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`)
-  const parsed = html && parseRecipeHtml(html)
-  if (parsed) return parsed
-
-  const md = await getText(`https://r.jina.ai/${url}`)
-  if (md) {
-    const text = md
-      .replace(/^(Title|URL Source|Published Time|Markdown Content):.*$/gm, '')
-      .replace(/!\[[^\]]*\]\([^)]*\)/g, '') // 이미지
-      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // 링크 → 글자만
-      .replace(/\n{3,}/g, '\n\n')
-      .trim()
-    if (text.length > 50) return { text }
-  }
-  return null
+  const a = fromHtml(await getText(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`))
+  if (a) return a
+  const b = fromHtml(await getText(`https://r.jina.ai/${url}`, { headers: { 'X-Respond-With': 'html' } }))
+  if (b) return b
+  return structureText(await getText(`https://r.jina.ai/${url}`))
 }

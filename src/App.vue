@@ -7,7 +7,7 @@ import CookMode from './components/CookMode.vue'
 import Sheet from './components/Sheet.vue'
 import Thumb from './components/Thumb.vue'
 import { CATEGORIES, matchesQuery, parseNoteText, parseShare, SOURCE_LABEL } from './lib/recipes.js'
-import { addRecipe, fillMissingMeta, findByUrl, markOpened, removeRecipe, state, updateRecipe } from './lib/store.js'
+import { addRecipe, fillMissingMeta, findByUrl, prefetchContents, markOpened, removeRecipe, state, updateRecipe } from './lib/store.js'
 
 const query = ref('')
 const filter = ref('전체') // 전체 | ★ | 카테고리
@@ -157,9 +157,12 @@ onMounted(() => {
   window.addEventListener('popstate', onPopState)
   handleLaunchParams()
   fillMissingMeta()
+  setTimeout(prefetchContents, 1500)
+  window.addEventListener('online', prefetchContents)
 })
 onUnmounted(() => {
   window.removeEventListener('popstate', onPopState)
+  window.removeEventListener('online', prefetchContents)
   window.removeEventListener('beforeinstallprompt', onBeforeInstall)
   window.removeEventListener('appinstalled', onInstalled)
 })
@@ -295,8 +298,9 @@ const appUrl = computed(() => location.origin + location.pathname)
       <h3>요리 중 음성 명령</h3>
       <p>레시피 카드를 누르면 <b>요리 모드</b>가 열려요(화면이 꺼지지 않아요). 오른쪽 위 <b>🎤</b>를 켜고 짧게 말하세요.</p>
       <ul>
-        <li>“<b>내려</b>” “<b>올려</b>” “<b>맨 위로</b>” “<b>맨 아래</b>”</li>
-        <li>“<b>다음 단계</b>” “<b>이전 단계</b>” “<b>읽어 줘</b>”(지금 단계를 소리로)</li>
+        <li>“<b>다음</b>” “<b>이전</b>” “<b>재료</b>” “<b>읽어 줘</b>”(지금 단계를 소리로)</li>
+        <li>“<b>내려</b>” “<b>올려</b>” “<b>맨 위로</b>” “<b>맨 아래</b>” “<b>전체 보기</b>”</li>
+        <li>“<b>크게</b>” “<b>작게</b>”(글씨 크기)</li>
         <li>유튜브: “<b>재생</b>” “<b>멈춰</b>” “<b>뒤로</b>”(10초) “<b>앞으로</b>”</li>
         <li>“<b>닫아</b>” “<b>그만 들어</b>”</li>
       </ul>

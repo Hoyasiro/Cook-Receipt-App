@@ -44,7 +44,19 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png}'],
-        navigateFallback: `${base}index.html`
+        navigateFallback: `${base}index.html`,
+        // 썸네일·조리 사진을 한 번 보면 저장해 두어 인터넷이 약해도 보이게 한다
+        runtimeCaching: [
+          {
+            urlPattern: ({ request, sameOrigin }) => request.destination === 'image' && !sameOrigin,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'recipe-images',
+              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 180 },
+              cacheableResponse: { statuses: [0, 200] }
+            }
+          }
+        ]
       }
     })
   ],
