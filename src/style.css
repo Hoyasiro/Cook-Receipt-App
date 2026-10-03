@@ -373,5 +373,41 @@ main { padding: 12px 16px 110px; max-width: 980px; margin: 0 auto; }
 .ring-item { font-size: 1.3rem; font-weight: 700; margin: 4px 0; }
 .ring-ok { min-height: 64px; font-size: 1.4rem; margin-top: 16px; }
 .version { text-align: center; color: var(--muted); font-size: 0.8rem; margin-top: 16px; }
-.timer-picker .row input { flex: none; }
-.timer-picker .row .btn { white-space: nowrap; }
+
+
+/* ── 시계 다이얼 ── */
+.timer-picker .dial-open { margin-top: 0; font-size: 1.05rem; }
+.dial-backdrop {
+  position: fixed; inset: 0; z-index: 35; background: rgba(0, 0, 0, 0.5);
+  display: grid; place-items: center; padding: 16px;
+}
+.dial-box {
+  background: var(--bg); border-radius: 24px; padding: 18px 18px 16px; width: 100%; max-width: 360px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+.dial-title { margin: 0 0 6px; font-weight: 700; color: var(--muted); font-size: 0.95rem; }
+.dial-readout { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 10px; }
+.dial-readout > span { font-size: 2.6rem; font-weight: 800; color: var(--muted); }
+.dial-readout button {
+  border: none; border-radius: 14px; padding: 4px 12px; background: var(--surface); color: var(--muted);
+  font-size: 3rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.2; cursor: pointer;
+}
+.dial-readout button small { font-size: 0.35em; margin-left: 2px; }
+.dial-readout button.on { background: var(--accent-soft); color: var(--accent); }
+.dial { display: block; width: 100%; max-width: 300px; margin: 0 auto; touch-action: none; user-select: none; cursor: pointer; }
+.dial-face { fill: var(--surface); stroke: var(--line); stroke-width: 2; }
+.dial-tick { stroke: var(--line); stroke-width: 2; }
+.dial-tick.major { stroke: var(--muted); stroke-width: 3; }
+.dial-hand { stroke: var(--accent); stroke-width: 4; stroke-linecap: round; }
+.dial-center { fill: var(--accent); }
+.dial-knob { fill: var(--accent); }
+.dial-label { font-size: 20px; font-weight: 700; fill: var(--text); pointer-events: none; }
+.dial-label.sel { fill: #fff; }
+.dial-nudge { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0 12px; }
+.dial-nudge span { font-size: 0.82rem; color: var(--muted); text-align: center; }
+.dial-nudge button {
+  width: 56px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface);
+  font-size: 1.1rem; font-weight: 700; cursor: pointer;
+}
+.dial-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; }
+.dial-actions .btn { min-height: 54px; font-size: 1.1rem; }

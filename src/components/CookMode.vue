@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { youtubeId, SOURCE_LABEL } from '../lib/recipes.js'
+import DialPicker from './DialPicker.vue'
 import { createVoiceListener, isVoiceSupported, speak } from '../lib/voice.js'
 import { isContentLoading, loadContent } from '../lib/store.js'
 import {
@@ -146,18 +147,20 @@ const currentStep = computed(() => (hasPages.value && page.value >= 0 ? page.val
 
 // 직접 맞추기
 const picker = ref(false)
-const customMin = ref(5)
-const customSec = ref(0)
 const PRESETS = [30, 60, 180, 300, 600, 900, 1200, 1800] // 초
-const customTotal = computed(() => {
-  const m = Math.max(0, Math.floor(Number(customMin.value) || 0))
-  const s = Math.max(0, Math.floor(Number(customSec.value) || 0))
-  return m * 60 + s
-})
 function startCustom(sec) {
   if (!(sec > 0)) return
   startStepTimer(currentStep.value, sec)
   picker.value = false
+  dial.value = false
+}
+// 시계 다이얼 팝업 (마지막에 고른 값을 기억)
+const dial = ref(false)
+const lastDial = ref(Number(pref('dial', 300)) || 300)
+function onDialConfirm(sec) {
+  lastDial.value = sec
+  setPref('dial', sec)
+  startCustom(sec)
 }
 
 // ── 음성 명령 ──
@@ -321,16 +324,17 @@ onUnmounted(() => {
       <div class="presets">
         <button v-for="sec in PRESETS" :key="sec" @click="startCustom(sec)">{{ formatDuration(sec) }}</button>
       </div>
-      <div class="row">
-        <input v-model.number="customMin" type="number" min="0" step="1" inputmode="numeric" aria-label="분" />
-        <span>분</span>
-        <input v-model.number="customSec" type="number" min="0" max="59" step="1" inputmode="numeric" aria-label="초" />
-        <span>초</span>
-        <button class="btn primary grow" :disabled="!customTotal" @click="startCustom(customTotal)">
-          {{ currentStep != null ? `${currentStep + 1}단계 ` : '' }}타이머 시작
-        </button>
-      </div>
+      <button class="btn ghost block dial-open" @click="dial = true">🕒 직접 설정 (분·초 다이얼)</button>
     </div>
+
+    <DialPicker
+      v-if="dial"
+      :minutes="Math.floor(lastDial / 60)"
+      :seconds="lastDial % 60"
+      :start-label="`${currentStep != null ? `${currentStep + 1}단계 ` : ''}타이머 시작`"
+      @confirm="onDialConfirm"
+      @cancel="dial = false"
+    />
 
     <div v-if="recipeTimers.length" class="timer-bar">
       <span v-for="t in recipeTimers" :key="t.id" class="timer-pill" :class="{ done: t.fired }">
