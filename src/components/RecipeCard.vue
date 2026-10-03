@@ -7,7 +7,7 @@ const emit = defineEmits(['open', 'edit', 'favorite'])
 
 <template>
   <article class="card">
-    <a class="card-link" :href="props.recipe.url" target="_blank" rel="noopener" @click="emit('open', props.recipe)">
+    <div class="card-link" role="button" tabindex="0" @click="emit('open', props.recipe)" @keydown.enter="emit('open', props.recipe)">
       <Thumb :recipe="props.recipe" badge />
       <div class="card-text">
         <h3>{{ props.recipe.title || '이름 없는 레시피' }}</h3>
@@ -16,7 +16,7 @@ const emit = defineEmits(['open', 'edit', 'favorite'])
           <span v-if="props.recipe.memo" class="memo">{{ props.recipe.memo }}</span>
         </p>
       </div>
-    </a>
+    </div>
     <div class="card-actions">
       <button
         class="icon-btn star"

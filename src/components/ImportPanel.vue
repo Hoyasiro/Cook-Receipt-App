@@ -3,9 +3,10 @@ import { computed, ref } from 'vue'
 import { guessCategory, parseNoteText, SOURCE_LABEL, detectSource } from '../lib/recipes.js'
 import { addRecipe, exportJson, fillMissingMeta, findByUrl, importJson } from '../lib/store.js'
 
+const props = defineProps({ initialText: { type: String, default: '' } })
 const emit = defineEmits(['done', 'toast'])
 
-const text = ref('')
+const text = ref(props.initialText)
 const parsed = computed(() =>
   parseNoteText(text.value).map((it) => ({
     ...it,
@@ -69,7 +70,8 @@ async function restore(ev) {
     <section>
       <h3>삼성 노트에서 가져오기</h3>
       <p class="muted">
-        노트에서 <b>모두 선택 → 복사</b>한 뒤 아래에 붙여넣으세요.<br />
+        노트에서 글을 <b>모두 선택 → 공유 → 요리 레시피</b>를 누르거나,<br />
+        <b>복사</b>해서 아래에 붙여넣으세요. 이미 있는 링크는 건너뛰어요.<br />
         링크 바로 다음 줄에 적은 글자를 요리 이름으로 인식해요.
       </p>
       <textarea

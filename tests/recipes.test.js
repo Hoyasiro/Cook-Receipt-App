@@ -75,3 +75,57 @@ describe('기타 도우미', () => {
     expect(matchesQuery(r, '멸치 고추장')).toBe(false)
   })
 })
+
+import { parseCommand } from '../src/lib/voice.js'
+import { parseRecipeHtml } from '../src/lib/content.js'
+
+describe('parseCommand', () => {
+  it('한국어 음성 명령을 동작으로 바꾼다', () => {
+    const cases = {
+      '내려 줘': 'down',
+      '아래로 스크롤': 'down',
+      '스크롤 해줘': 'down',
+      '위로 스크롤': 'up',
+      '올려': 'up',
+      '맨 위로': 'top',
+      '맨 아래로 가 줘': 'bottom',
+      '다음 단계': 'nextStep',
+      '이전 단계': 'prevStep',
+      '읽어 줘': 'read',
+      '재생': 'play',
+      '멈춰': 'pause',
+      '10초 뒤로': 'rewind',
+      '앞으로 넘겨': 'forward',
+      '그만 들어': 'stop',
+      '닫아 줘': 'close',
+      '오늘 날씨 어때': null,
+      '이제 멸치를 팬에 넣고 아래쪽까지 잘 볶아 주세요': null
+    }
+    for (const [said, action] of Object.entries(cases)) expect([said, parseCommand(said)]).toEqual([said, action])
+  })
+})
+
+describe('parseRecipeHtml', () => {
+  it('JSON-LD Recipe 에서 재료와 순서를 뽑는다', () => {
+    const html = `<html><head>
+      <script type="application/ld+json">{"@context":"http://schema.org","@type":"Organization","name":"x"}</script>
+      <script type="application/ld+json">{"@context":"http://schema.org/","@type":"Recipe","name":"간장 멸치볶음",
+        "recipeIngredient":["잔멸치 1컵","간장 1스푼","올리고당 2스푼"],
+        "recipeInstructions":[{"@type":"HowToStep","text":"팬에 멸치를 &amp; 볶아요.","image":"https://a/1.jpg"},
+          {"@type":"HowToStep","text":"간장과 <b>올리고당</b>을 넣어요."}]}</script></head></html>`
+    expect(parseRecipeHtml(html)).toEqual({
+      title: '간장 멸치볶음',
+      ingredients: ['잔멸치 1컵', '간장 1스푼', '올리고당 2스푼'],
+      steps: [
+        { text: '팬에 멸치를 & 볶아요.', image: 'https://a/1.jpg' },
+        { text: '간장과 올리고당 을 넣어요.', image: '' }
+      ]
+    })
+  })
+
+  it('@graph 와 문자열 순서도 처리하고, Recipe 가 없으면 null', () => {
+    const html = `<script type="application/ld+json">{"@graph":[{"@type":["Recipe"],"name":"a","recipeInstructions":"1. 썰기\\n2. 볶기"}]}</script>`
+    expect(parseRecipeHtml(html).steps.map((s) => s.text)).toEqual(['1. 썰기', '2. 볶기'])
+    expect(parseRecipeHtml('<html>nothing</html>')).toBeNull()
+  })
+})

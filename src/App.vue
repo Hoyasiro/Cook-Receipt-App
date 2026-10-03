@@ -3,9 +3,10 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import RecipeCard from './components/RecipeCard.vue'
 import RecipeForm from './components/RecipeForm.vue'
 import ImportPanel from './components/ImportPanel.vue'
+import CookMode from './components/CookMode.vue'
 import Sheet from './components/Sheet.vue'
 import Thumb from './components/Thumb.vue'
-import { CATEGORIES, matchesQuery, parseShare, SOURCE_LABEL } from './lib/recipes.js'
+import { CATEGORIES, matchesQuery, parseNoteText, parseShare, SOURCE_LABEL } from './lib/recipes.js'
 import { addRecipe, fillMissingMeta, findByUrl, markOpened, removeRecipe, state, updateRecipe } from './lib/store.js'
 
 const query = ref('')
@@ -62,8 +63,11 @@ function showToast(msg) {
 }
 
 // ── 동작 ──
+// 카드를 누르면 앱 안 요리 모드로 연다 (화면 꺼짐 방지 · 음성 명령)
 function onOpen(recipe) {
   markOpened(recipe.id)
+  if (modal.value) modal.value = { type: 'cook', recipe }
+  else openModal({ type: 'cook', recipe })
 }
 function onFavorite(recipe) {
   updateRecipe(recipe.id, { favorite: !recipe.favorite })
@@ -102,6 +106,10 @@ function handleLaunchParams() {
   const p = new URLSearchParams(location.search)
   if (![...p.keys()].length) return
   history.replaceState(null, '', location.pathname)
+
+  // 삼성 노트에서 글을 선택해 공유하면 링크가 여러 개 들어온다 → 가져오기 화면으로
+  const sharedText = [p.get('title'), p.get('text'), p.get('url')].filter(Boolean).join('\n')
+  if (parseNoteText(sharedText).length > 1) return openModal({ type: 'import', text: sharedText })
 
   const shared = parseShare({ title: p.get('title'), text: p.get('text'), url: p.get('url') })
   if (shared) {
@@ -221,9 +229,12 @@ const appUrl = computed(() => location.origin + location.pathname)
     <RecipeForm :recipe="modal.recipe" :prefill="modal.prefill" @save="onSave" @remove="onRemove" @cancel="closeModal" />
   </Sheet>
 
+  <!-- 요리 모드 -->
+  <CookMode v-if="modal?.type === 'cook'" :key="modal.recipe.id" :recipe="modal.recipe" @close="closeModal" />
+
   <!-- 가져오기 / 백업 -->
   <Sheet v-if="modal?.type === 'import'" title="가져오기 · 백업" @close="closeModal">
-    <ImportPanel @done="closeModal" @toast="showToast" />
+    <ImportPanel :initial-text="modal.text" @done="closeModal" @toast="showToast" />
   </Sheet>
 
   <!-- 랜덤 추천 · 딥링크 결과 -->
@@ -233,9 +244,7 @@ const appUrl = computed(() => location.origin + location.pathname)
       <h3>{{ modal.recipe.title || '이름 없는 레시피' }}</h3>
       <p class="muted">{{ modal.recipe.category }} · {{ SOURCE_LABEL[modal.recipe.source] }}</p>
       <p v-if="modal.recipe.memo" class="memo-box">{{ modal.recipe.memo }}</p>
-      <a class="btn primary block" :href="modal.recipe.url" target="_blank" rel="noopener" @click="onOpen(modal.recipe)">
-        레시피 열기
-      </a>
+      <button class="btn primary block" @click="onOpen(modal.recipe)">레시피 열기</button>
       <button v-if="modal.title === '오늘 뭐 먹지?'" class="btn ghost block" @click="pickRandom(modal.recipe.id)">
         🎲 다른 거 추천
       </button>
@@ -283,6 +292,14 @@ const appUrl = computed(() => location.origin + location.pathname)
           <code class="url">{{ appUrl }}?random=1</code>
         </li>
       </ol>
+      <h3>요리 중 음성 명령</h3>
+      <p>레시피 카드를 누르면 <b>요리 모드</b>가 열려요(화면이 꺼지지 않아요). 오른쪽 위 <b>🎤</b>를 켜고 짧게 말하세요.</p>
+      <ul>
+        <li>“<b>내려</b>” “<b>올려</b>” “<b>맨 위로</b>” “<b>맨 아래</b>”</li>
+        <li>“<b>다음 단계</b>” “<b>이전 단계</b>” “<b>읽어 줘</b>”(지금 단계를 소리로)</li>
+        <li>유튜브: “<b>재생</b>” “<b>멈춰</b>” “<b>뒤로</b>”(10초) “<b>앞으로</b>”</li>
+        <li>“<b>닫아</b>” “<b>그만 들어</b>”</li>
+      </ul>
       <p class="muted">앱 아이콘을 길게 누르면 “레시피 추가”, “오늘 뭐 먹지?” 바로가기도 있어요.</p>
     </div>
   </Sheet>
