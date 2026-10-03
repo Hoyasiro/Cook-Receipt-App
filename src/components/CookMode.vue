@@ -147,9 +147,14 @@ const currentStep = computed(() => (hasPages.value && page.value >= 0 ? page.val
 // 직접 맞추기
 const picker = ref(false)
 const customMin = ref(5)
-const PRESETS = [1, 3, 5, 10, 15, 20, 30]
-function startCustom(min) {
-  const sec = Math.round(Number(min) * 60)
+const customSec = ref(0)
+const PRESETS = [30, 60, 180, 300, 600, 900, 1200, 1800] // 초
+const customTotal = computed(() => {
+  const m = Math.max(0, Math.floor(Number(customMin.value) || 0))
+  const s = Math.max(0, Math.floor(Number(customSec.value) || 0))
+  return m * 60 + s
+})
+function startCustom(sec) {
   if (!(sec > 0)) return
   startStepTimer(currentStep.value, sec)
   picker.value = false
@@ -314,12 +319,14 @@ onUnmounted(() => {
 
     <div v-if="picker" class="timer-picker">
       <div class="presets">
-        <button v-for="m in PRESETS" :key="m" @click="startCustom(m)">{{ m }}분</button>
+        <button v-for="sec in PRESETS" :key="sec" @click="startCustom(sec)">{{ formatDuration(sec) }}</button>
       </div>
       <div class="row">
-        <input v-model.number="customMin" type="number" min="0.5" step="0.5" inputmode="decimal" aria-label="분" />
+        <input v-model.number="customMin" type="number" min="0" step="1" inputmode="numeric" aria-label="분" />
         <span>분</span>
-        <button class="btn primary grow" @click="startCustom(customMin)">
+        <input v-model.number="customSec" type="number" min="0" max="59" step="1" inputmode="numeric" aria-label="초" />
+        <span>초</span>
+        <button class="btn primary grow" :disabled="!customTotal" @click="startCustom(customTotal)">
           {{ currentStep != null ? `${currentStep + 1}단계 ` : '' }}타이머 시작
         </button>
       </div>
