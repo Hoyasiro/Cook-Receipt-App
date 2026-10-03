@@ -68,13 +68,46 @@ watch(
 )
 const focusMode = computed(() => view.value === 'focus' && hasPages.value)
 
-async function goPage(i) {
+// 사용자가(버튼·음성) 단계를 바꾸면 유튜브 영상도 그 단계 장면으로 옮긴다
+async function goPage(i, { seekVideo = true } = {}) {
   if (!hasPages.value) return false
   page.value = Math.min(Math.max(i, firstPage.value), steps.value.length - 1)
+  if (seekVideo) {
+    lastManual = Date.now()
+    const t = steps.value[page.value]?.t
+    if (t != null && player?.seekTo) player.seekTo(t, true)
+  }
   await nextTick()
   if (focusMode.value) body.value?.scrollTo({ top: 0 })
   else body.value?.querySelector(`[data-step="${page.value}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   return true
+}
+
+function playScene(i) {
+  const t = steps.value[i]?.t
+  if (t == null || !player?.seekTo) return
+  lastManual = Date.now()
+  page.value = i
+  player.seekTo(t, true)
+  player.playVideo?.()
+}
+
+// 영상이 재생되는 동안 지금 장면에 해당하는 단계를 자동으로 따라간다 (방금 직접 넘겼으면 잠시 쉼)
+let lastManual = 0
+let followTimer = null
+function followVideo() {
+  if (!player?.getCurrentTime || player.getPlayerState?.() !== 1) return
+  if (Date.now() - lastManual < 5000) return
+  const now = player.getCurrentTime()
+  let idx = -1
+  steps.value.forEach((s, i) => {
+    if (s.t != null && s.t <= now + 0.5) idx = i
+  })
+  if (idx >= 0 && idx !== page.value) goPage(idx, { seekVideo: false })
+}
+const hasScenes = computed(() => steps.value.some((s) => s.t != null))
+function clock(t) {
+  return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`
 }
 
 function refresh() {
@@ -265,8 +298,9 @@ function onVisible() {
 }
 
 onMounted(() => {
-  if (!ytId && !content.value) loadContent(props.recipe.id)
+  if (!content.value) loadContent(props.recipe.id)
   initPlayer()
+  if (ytId) followTimer = setInterval(followVideo, 1000)
   keepAwake()
   document.addEventListener('visibilitychange', onVisible)
   if (voiceSupported) {
@@ -286,6 +320,7 @@ onUnmounted(() => {
   window.speechSynthesis?.cancel()
   wakeLock?.release?.().catch(() => {})
   document.removeEventListener('visibilitychange', onVisible)
+  clearInterval(followTimer)
   player?.destroy?.()
 })
 </script>
@@ -362,8 +397,15 @@ onUnmounted(() => {
       <div v-if="ytId" class="player"><div ref="playerEl" /></div>
       <p v-if="props.recipe.memo" class="memo-box">📝 {{ props.recipe.memo }}</p>
 
-      <template v-if="!ytId">
-        <p v-if="loading && !content" class="state-msg">레시피 내용을 가져오는 중…</p>
+      <!-- 단계가 있으면 접어 두고, 없으면 펼쳐 둔다 -->
+      <details v-if="content?.note" class="memo-box video-note" :open="!steps.length">
+        <summary>📝 <b>영상 설명</b></summary>
+        {{ content.note }}
+      </details>
+      <p v-if="ytId && hasScenes" class="scene-hint">▶ 단계를 넘기면 영상도 그 장면으로 이동해요</p>
+
+      <template v-if="true">
+        <p v-if="loading && !content" class="state-msg">{{ ytId ? '영상 설명·챕터를 읽는 중…' : '레시피 내용을 가져오는 중…' }}</p>
 
         <!-- 한 단계씩 크게 -->
         <template v-else-if="focusMode">
@@ -381,6 +423,9 @@ onUnmounted(() => {
               <b>{{ page + 1 }}</b> <small>/ {{ steps.length }} 단계</small>
             </p>
             <p class="focus-text">{{ steps[page].text }}</p>
+            <button v-if="ytId && steps[page].t != null" class="scene-chip" @click="playScene(page)">
+              ▶ {{ clock(steps[page].t) }} 장면 보기
+            </button>
             <div v-if="stepDurations[page].length" class="step-timers">
               <template v-for="d in stepDurations[page]" :key="d.seconds">
                 <button v-if="!stepTimer(page, d.seconds)" class="timer-chip" @click="startStepTimer(page, d.seconds, d.label)">
@@ -410,6 +455,7 @@ onUnmounted(() => {
                 <span class="no">{{ i + 1 }}</span>
                 <div>
                   <p>{{ s.text }}</p>
+                  <button v-if="ytId && s.t != null" class="scene-chip" @click.stop="playScene(i)">▶ {{ clock(s.t) }}</button>
                   <div v-if="stepDurations[i].length" class="step-timers" @click.stop>
                     <template v-for="d in stepDurations[i]" :key="d.seconds">
                       <button v-if="!stepTimer(i, d.seconds)" class="timer-chip" @click="startStepTimer(i, d.seconds, d.label)">
@@ -432,7 +478,8 @@ onUnmounted(() => {
         </div>
 
         <div v-else-if="failed" class="state-msg">
-          <p>이 레시피 내용은 앱 안에서 보여줄 수 없었어요.</p>
+          <p v-if="ytId">이 영상엔 정리할 레시피 글·챕터가 없어요.<br />영상을 보며 요리하세요.</p>
+          <p v-else>이 레시피 내용은 앱 안에서 보여줄 수 없었어요.</p>
           <button class="btn ghost" @click="refresh">다시 시도</button>
         </div>
       </template>
