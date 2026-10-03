@@ -137,20 +137,40 @@ const flash = ref('')
 let voice = null
 
 const ACTION_LABEL = {
-  down: '⬇ 내려요', up: '⬆ 올려요', top: '⏫ 맨 위', bottom: '⏬ 맨 아래', nextStep: '다음 ▶',
+  down: '⬇ 내려요', up: '⬆ 올려요', top: '⏫ 맨 위로', bottom: '⏬ 마지막 단계', nextStep: '다음 ▶',
   prevStep: '◀ 이전', read: '🔊 읽어요', play: '▶ 재생', pause: '⏸ 멈춤', rewind: '⏪ 10초 뒤로',
   forward: '⏩ 10초 앞으로', close: '닫기', stop: '🎤 끔', bigger: '가+ 크게', smaller: '가− 작게',
   ingredients: '🥕 재료', all: '📜 전체 보기'
 }
 
+function showFlash(text) {
+  flash.value = text
+  clearTimeout(showFlash.t)
+  showFlash.t = setTimeout(() => (flash.value = ''), 1100)
+}
+
+// "7번으로" → 7단계로 바로 이동
+async function gotoStep(n) {
+  if (!steps.value.length) return showFlash('단계 정보가 없어요')
+  if (n < 1 || n > steps.value.length) return showFlash(`${n}단계는 없어요 (1~${steps.value.length})`)
+  showFlash(`${n}단계로 이동`)
+  return goPage(n - 1)
+}
+
 async function onCommand(action) {
-  flash.value = ACTION_LABEL[action] || ''
-  setTimeout(() => (flash.value = ''), 900)
+  if (action.startsWith('goto:')) return gotoStep(Number(action.slice(5)))
+  showFlash(ACTION_LABEL[action] || '')
   switch (action) {
     case 'down': return scrollPage(1)
     case 'up': return scrollPage(-1)
-    case 'top': return scrollEdge(true)
-    case 'bottom': return scrollEdge(false)
+    // 맨 위 = 재료(첫 화면), 끝 = 마지막 단계
+    case 'top':
+      if (hasPages.value) await goPage(firstPage.value)
+      return scrollEdge(true)
+    case 'bottom':
+      if (hasPages.value) await goPage(steps.value.length - 1)
+      if (!focusMode.value) return scrollEdge(false)
+      return
     case 'nextStep': return (await goPage(page.value + 1)) || scrollPage(1)
     case 'prevStep': return (await goPage(page.value - 1)) || scrollPage(-1)
     case 'ingredients':
@@ -238,7 +258,7 @@ onUnmounted(() => {
     <div v-if="listening || voiceError" class="voice-bar" :class="{ err: voiceError }">
       <template v-if="voiceError">{{ voiceError }}</template>
       <template v-else>
-        <span class="dot" /> 듣는 중 — “다음” “이전” “내려” “올려” “재료” “읽어 줘” “크게”<template v-if="ytId">
+        <span class="dot" /> 듣는 중 — “다음” “이전” “3번” “끝으로” “맨 위로” “재료” “내려” “올려” “읽어 줘” “크게”<template v-if="ytId">
           “재생” “멈춰” “뒤로”</template>
         <span v-if="heard" class="heard">· {{ heard }}</span>
       </template>

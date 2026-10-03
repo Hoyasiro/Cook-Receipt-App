@@ -6,8 +6,8 @@ const RULES = [
   ['smaller', /(작게|줄여|축소)/],
   ['ingredients', /(재료)/],
   ['all', /(전체\s*보기|전체|다\s*보여)/],
-  ['top', /(맨\s*위|처음으로|맨\s*처음)/],
-  ['bottom', /(맨\s*아래|맨\s*끝|끝으로)/],
+  ['top', /(맨\s*위|처음|위로\s*올라)/],
+  ['bottom', /(맨\s*아래|끝|마지막)/],
   ['nextStep', /(다음)/],
   ['prevStep', /(이전|전\s*단계|앞\s*단계)/],
   ['read', /(읽어|말해)/],
@@ -21,14 +21,48 @@ const RULES = [
   ['stop', /(그만\s*들어|듣지\s*마|마이크\s*꺼)/]
 ]
 
-/** 말한 문장 → 동작 이름 (모르면 null) */
+// ── 숫자 말하기: "7", "칠", "일곱", "십이", "열두", "첫" ──
+const SINO = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 륙: 6, 칠: 7, 팔: 8, 구: 9 }
+const NATIVE_ONES = { 한: 1, 하나: 1, 첫: 1, 두: 2, 둘: 2, 세: 3, 셋: 3, 네: 4, 넷: 4, 다섯: 5, 여섯: 6, 일곱: 7, 여덟: 8, 아홉: 9 }
+const NATIVE_TENS = { 열: 10, 스무: 20, 스물: 20, 서른: 30 }
+
+export function koreanNumber(word) {
+  const w = String(word || '').replace(/\s/g, '')
+  if (!w) return null
+  if (/^\d+$/.test(w)) return Number(w)
+  if (w in NATIVE_ONES) return NATIVE_ONES[w]
+  for (const [k, v] of Object.entries(NATIVE_TENS)) {
+    if (w === k) return v
+    if (w.startsWith(k) && w.slice(k.length) in NATIVE_ONES) return v + NATIVE_ONES[w.slice(k.length)]
+  }
+  // 한자어: 십, 십이, 이십, 이십삼
+  const m = w.match(/^([일이삼사오육륙칠팔구])?(십)?([일이삼사오육륙칠팔구])?$/)
+  if (m && (m[1] || m[2] || m[3])) {
+    if (!m[2]) return m[3] ? null : SINO[m[1]]
+    return (m[1] ? SINO[m[1]] : 1) * 10 + (m[3] ? SINO[m[3]] : 0)
+  }
+  return null
+}
+
+/** "7번으로 이동해 줘", "세 번째 단계", "3단계" → 7 / 3 / 3 */
+export function parseStepNumber(t) {
+  const m = String(t).match(/([0-9]+|[가-힣]+?)\s*(번째|번|단계|스텝)/)
+  return m ? koreanNumber(m[1]) : null
+}
+
+/** 말한 문장 → 동작 이름 (모르면 null). 번호 이동은 "goto:7" */
 export function parseCommand(transcript) {
   const t = String(transcript || '').replace(/\s+/g, ' ').trim()
   if (!t) return null
   // 영상 속 말소리 같은 긴 문장은 명령으로 보지 않는다
-  if (t.replace(/\s/g, '').length > 12) return null
+  if (t.replace(/\s/g, '').length > 14) return null
   // "그만 들어"가 "들어"보다 먼저 걸리도록 stop 을 먼저 본다
   if (RULES.at(-1)[1].test(t)) return 'stop'
+  // "한 번 더 읽어 줘", "다시 한 번 재생" 의 '한 번' 은 번호가 아니다
+  if (!/(읽어|말해|재생|틀어|더)/.test(t)) {
+    const n = parseStepNumber(t)
+    if (n) return `goto:${n}`
+  }
   for (const [action, re] of RULES) if (re.test(t)) return action
   return null
 }
