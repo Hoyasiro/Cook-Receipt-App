@@ -120,12 +120,41 @@ function handleLaunchParams() {
   }
 }
 
+// ── 앱 설치 (크롬의 설치 창을 버튼으로 띄운다) ──
+const installPrompt = ref(null)
+const installed = ref(window.matchMedia?.('(display-mode: standalone)').matches)
+function onBeforeInstall(e) {
+  e.preventDefault()
+  installPrompt.value = e
+}
+function onInstalled() {
+  installPrompt.value = null
+  installed.value = true
+  showToast('설치했어요! 홈 화면의 요리 레시피 아이콘으로 여세요')
+}
+window.addEventListener('beforeinstallprompt', onBeforeInstall)
+window.addEventListener('appinstalled', onInstalled)
+
+async function install() {
+  if (!installPrompt.value) {
+    openModal({ type: 'install' })
+    return
+  }
+  installPrompt.value.prompt()
+  await installPrompt.value.userChoice.catch(() => {})
+  installPrompt.value = null
+}
+
 onMounted(() => {
   window.addEventListener('popstate', onPopState)
   handleLaunchParams()
   fillMissingMeta()
 })
-onUnmounted(() => window.removeEventListener('popstate', onPopState))
+onUnmounted(() => {
+  window.removeEventListener('popstate', onPopState)
+  window.removeEventListener('beforeinstallprompt', onBeforeInstall)
+  window.removeEventListener('appinstalled', onInstalled)
+})
 
 watch(filters, (f) => {
   if (!f.includes(filter.value)) filter.value = '전체'
@@ -138,6 +167,8 @@ const appUrl = computed(() => location.origin + location.pathname)
   <header class="top">
     <div class="title-row">
       <h1>🍳 요리 레시피 <small>{{ state.recipes.length }}</small></h1>
+      <span class="spacer" />
+      <button v-if="!installed" class="btn primary small" @click="install">📲 앱 설치</button>
       <button class="icon-btn" aria-label="메뉴" @click="openModal({ type: 'menu' })">☰</button>
     </div>
     <div class="search">
@@ -219,11 +250,23 @@ const appUrl = computed(() => location.origin + location.pathname)
     </div>
   </Sheet>
 
+  <!-- 설치 안내 (설치 창을 띄울 수 없을 때) -->
+  <Sheet v-if="modal?.type === 'install'" title="앱 설치하기" @close="closeModal">
+    <div class="guide">
+      <ol>
+        <li>크롬 오른쪽 위 <b>⋮</b> 를 누르세요.</li>
+        <li><b>설치 및 바로가기 만들기</b> (또는 <b>앱 설치</b>) → <b>설치</b></li>
+        <li>홈 화면에 생긴 <b>요리 레시피</b> 아이콘으로 여세요.</li>
+      </ol>
+      <p class="muted">삼성 인터넷이 아니라 <b>크롬</b>에서 열어야 “공유 → 요리 레시피”가 나타나요.</p>
+    </div>
+  </Sheet>
+
   <!-- 빅스비 설정 안내 -->
   <Sheet v-if="modal?.type === 'voice'" title="음성으로 앱 열기" @close="closeModal">
     <div class="guide">
       <ol>
-        <li><b>먼저 앱 설치:</b> 크롬에서 이 페이지를 열고 <b>⋮ → 홈 화면에 추가 → 설치</b>를 누르세요.</li>
+        <li><b>먼저 앱 설치:</b> 크롬에서 이 페이지를 열고 <b>⋮ → 설치 및 바로가기 만들기 → 설치</b>를 누르세요.</li>
         <li>
           바로 <b>"하이 빅스비, 요리 레시피 열어줘"</b>라고 말해도 열려요.
         </li>
