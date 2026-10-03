@@ -179,6 +179,9 @@ function openTimerRecipe(t) {
   if (r) onOpen(r)
 }
 
+// eslint-disable-next-line no-undef
+const appVersion = __APP_VERSION__
+
 const appUrl = computed(() => location.origin + location.pathname)
 </script>
 
@@ -288,6 +291,7 @@ const appUrl = computed(() => location.origin + location.pathname)
     <div class="menu">
       <button class="btn ghost block" @click="modal = { type: 'import' }">📋 삼성 노트에서 가져오기 · 백업</button>
       <button class="btn ghost block" @click="modal = { type: 'voice' }">🎙️ 음성으로 앱 열기 설정</button>
+      <p class="version">버전 {{ appVersion }}</p>
     </div>
   </Sheet>
 

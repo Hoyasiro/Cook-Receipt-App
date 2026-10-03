@@ -372,3 +372,4 @@ main { padding: 12px 16px 110px; max-width: 980px; margin: 0 auto; }
 .ring-title { font-size: 2.2rem; font-weight: 900; margin: 6px 0 10px; }
 .ring-item { font-size: 1.3rem; font-weight: 700; margin: 4px 0; }
 .ring-ok { min-height: 64px; font-size: 1.4rem; margin-top: 16px; }
+.version { text-align: center; color: var(--muted); font-size: 0.8rem; margin-top: 16px; }

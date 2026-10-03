@@ -6,12 +6,19 @@ import { VitePWA } from 'vite-plugin-pwa'
 // 배포 워크플로가 BASE_PATH 로 넘겨주고, 로컬 개발은 / 를 쓴다.
 const base = process.env.BASE_PATH || '/'
 
+// 화면에 보여줄 버전: 빌드 시각(한국 시간) + 커밋
+const builtAt = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 16)
+const APP_VERSION = `${builtAt}${process.env.GITHUB_SHA ? ` · ${process.env.GITHUB_SHA.slice(0, 7)}` : ''}`
+
 export default defineConfig({
   base,
+  define: { __APP_VERSION__: JSON.stringify(APP_VERSION) },
   plugins: [
     vue(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 등록·업데이트는 src/main.js 에서 직접 한다 (요리 중에는 새로고침을 미룬다)
+      registerType: 'prompt',
+      injectRegister: false,
       includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png'],
       manifest: {
         id: base,
@@ -46,6 +53,9 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png}'],
         navigateFallback: `${base}index.html`,
         importScripts: ['sw-notify.js'],
+        // 새 버전은 기다리지 않고 바로 적용 (화면 새로고침 시점은 main.js 가 정한다)
+        skipWaiting: true,
+        clientsClaim: true,
         // 썸네일·조리 사진을 한 번 보면 저장해 두어 인터넷이 약해도 보이게 한다
         runtimeCaching: [
           {
