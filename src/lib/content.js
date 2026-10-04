@@ -99,9 +99,8 @@ export function parseRecipeDom(html) {
 
 const JUNK = /(로그인|회원가입|광고|공유하기|스크랩|댓글|구독|팔로우|앱\s*다운|쿠키|copyright|ⓒ|©|바로가기|메뉴|검색|더보기|이전글|다음글|관련\s*레시피|추천\s*레시피|요리\s*후기|사진\s*후기|리뷰|신고)/i
 const END_MARK = /^(#+\s*)?(댓글|요리\s*후기|관련\s*레시피|추천\s*레시피|이\s*레시피와|레시피\s*작성자|요리\s*팁\s*더보기)/
-// 머리말 앞의 [ 【 < ( ▶ ✔ 같은 장식은 건너뛴다
-const ING_MARK = /^(#+\s*)?[\[【<(▶✔✅•■◆\s-]*(재료|Ingredients)/i
-const STEP_MARK = /^(#+\s*)?[\[【<(▶✔✅•■◆\s-]*(조리\s*(순서|법|방법)|요리\s*순서|만드는\s*(법|방법)|만들기|레시피\s*순서|Steps?|How to|Recipe)/i
+const ING_MARK = /^(#+\s*)?(\[?\s*재료|재료\s*Ingredients|Ingredients)/i
+const STEP_MARK = /^(#+\s*)?(조리\s*순서|요리\s*순서|만드는\s*(법|방법)|레시피\s*순서|Steps?|How to)/i
 const STEP_LINE = /^(step\s*\d+|\d+\s*[.)]|\d+\s*단계)\s*/i
 
 /** 리더 서비스의 본문 텍스트에서 잡음을 지우고, 가능하면 재료·순서로 나눈다 */
@@ -153,7 +152,7 @@ export function structureText(raw) {
   return text.length > 50 ? { text } : null
 }
 
-export async function getText(url, init = {}, ms = 15000) {
+async function getText(url, init = {}, ms = 15000) {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), ms)
   try {
