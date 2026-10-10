@@ -11,7 +11,7 @@
 이 앱은 앱스토어 없이 웹 주소에서 바로 설치하는 **PWA(설치형 웹앱)** 다. 한 번 설치하면 홈 화면 아이콘으로 열리고,
 주소창 없이 전체 화면으로 뜨며, 인터넷이 없어도 열린다.
 
-- 설치 주소: **https://hoyasiro.github.io/Cook-Receipt-App/** (직접 배포했다면 `https://<계정>.github.io/<저장소 이름>/`)
+- 설치 주소: **https://hansik-receipt.github.io/Cook-Receipt-App/** (직접 배포했다면 `https://<계정>.github.io/<저장소 이름>/`)
 - 반드시 위의 **https 배포 주소**에서 설치한다. `npm run dev` 의 `http://192.168.x.x` 같은 주소는 서비스워커가 동작하지 않아 설치되지 않는다.
 
 ### 어떤 브라우저로 설치해야 하나
